@@ -15,25 +15,25 @@ def save_text(text, filename):
     with open(filename, "w+", encoding='iso-8859-1') as f:
         f.write(text)
 
-def generate_xml_files(days_back):
+def generate_xml_files(n_days_back):
     
     create_export_folder(export)
     
     date = datetime.datetime.now()
-    back = datetime.timedelta(1)
-    n = days_back
+    step = datetime.timedelta(1)
+    n = n_days_back
     
     while n > 0:
-        date = date - back
-        data_format = date.strftime(date_format)
-        url = boe_diario_base.format(date=data_format)
+        formatted = date.strftime(date_format)
+        url = boe_diario_base.format(date=formatted)
         
         try:
             text = consum_boe(url)
-            save_text(text, export + data_format + ".xml")
+            save_text(text, export + formatted + ".xml")
         except Exception as e:
             print(e, n)
             
+        date = date - step
         n -= 1
 
 def create_export_folder(path):
