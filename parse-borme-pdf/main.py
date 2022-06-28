@@ -9,8 +9,13 @@ pdf_text = ""
 
 for (i, page) in enumerate(reader.pages):
     pdf_text += page.extract_text()
+    
+pdf_text += "\n$EOF$"
 
-pattern = re.compile(r"\d{6}\s-(.*?)\(\d{2}\.\d{2}.\d{2}\)", re.DOTALL)
+with open('BORME-A-2022-121-28.txt', 'w+') as f:
+    f.write(pdf_text)
+
+pattern = re.compile(r"\d{6}\s-(.*?)(\d{6}\s-|\$EOF\$)", re.DOTALL)
 matches = pattern.findall(pdf_text)
 
 print(f"Number of items: {len(matches)}")
@@ -31,10 +36,15 @@ labeled_matches = list(map(lambda x: map_match(x, keywords), matches))
 group_by_labeled_matches = dict()
 
 def convert(accum, tup):
-    a, b = tup
-    accum.setdefault(a, []).append(b.strip())
+    try:
+        a, (b, _) = tup
+        accum.setdefault(a, []).append(b.strip())
+        return accum
+    except Exception as e:
+        print(e)
     return accum
 
 mapped_matches_dict = reduce(convert, labeled_matches, group_by_labeled_matches)
 
 print(mapped_matches_dict.keys())
+
