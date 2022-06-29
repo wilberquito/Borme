@@ -5,8 +5,6 @@ from PyPDF2 import PdfReader
 import re
 from functools import reduce
 
-from numpy import mat
-
 others = 'Otros'
 keywords = ['Disolución', 'Cambio de denominación social', 'Constitución']
 pattern = r'\d{6}\s*-'
@@ -57,9 +55,20 @@ def take_bussiness_name(text):
         raise Exception('Bussiness name not found in text')
     start, end = match.span()
     bussiness_name = text[start:end]
-    bussiness_name = re.sub(r"\d{6}\s-\s", "", bussiness_name)
-    bussiness_name = re.sub(r'\.$', "", bussiness_name)
-    return bussiness_name
+    bussiness_name = re.sub(r'\d{6}\s-\s', '', bussiness_name)
+    bussiness_name = re.sub(r'\.$', '', bussiness_name)
+    return bussiness_name.strip()
+
+def take_submission_date(text):
+    submission_date_regex = r'\(\s*\d{2}\.\d{2}\.\d{2}\s*\)'
+    match = re.search(submission_date_regex, text)
+    if not match:
+        raise Exception('Submission date not found in text')
+    start, end = match.span()
+    submission_date = text[start:end]
+    submission_date = submission_date.replace('(', '')
+    submission_date = submission_date.replace(')', '')
+    return submission_date.strip()
 
 def map_inner_word(text, keyword, next_keyword, match):
     prefix = r'^{}\.\s*'.format(keyword) if keyword == 'Nombramientos' else  r'^{}:\s*'.format(keyword)
@@ -85,7 +94,8 @@ def map_constitucion(text):
     constituciones_keywords = ['Comienzo de operaciones', 'Objeto social', 'Domicilio', 'Capital', 'Nombramientos', 'Datos registrales']
     data = dict()
     data = {
-        'Negocio': take_bussiness_name(text).strip(),
+        'Negocio': take_bussiness_name(text),
+        'Submission date': take_submission_date(text),
     }
     text = text.replace('\n', ' ')
     for index in range(len(constituciones_keywords) - 1):
@@ -111,9 +121,9 @@ def take_bussiness(text):
     return bussinesses
 
 if __name__ == '__main__':
-    reader = PdfReader("BORME-A-2022-121-28.pdf")
+    reader = PdfReader('BORME-A-2022-121-28.pdf')
     number_of_pages = len(reader.pages)
-    pdf_text = ""
+    pdf_text = ''
 
     for (i, page) in enumerate(reader.pages):
         pdf_text += page.extract_text()
