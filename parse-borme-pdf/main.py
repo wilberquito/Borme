@@ -1,12 +1,10 @@
 from ast import pattern
-import math
-import time
 from PyPDF2 import PdfReader
 import re
 from functools import reduce
 
 others = 'Otros'
-keywords = ['Disolución', 'Cambio de denominación social', 'Constitución']
+keywords = ['Disolución', 'Cambio de domicilio social', 'Constitución']
 pattern = r'\d{6}\s*-'
 
 def is_target(text, keywords):
@@ -71,7 +69,7 @@ def take_submission_date(text):
     return submission_date.strip()
 
 def map_inner_word(text, keyword, next_keyword, match):
-    prefix = r'^{}\.\s*'.format(keyword) if keyword == 'Nombramientos' else  r'^{}:\s*'.format(keyword)
+    prefix = r'^{}\.\s*'.format(keyword) if keyword in ['Nombramientos', 'Cambio de domicilio social'] else r'^{}:\s*'.format(keyword)
     suffix = r'\.\s*{}$'.format(next_keyword)
     boe_footer = r'BOLETÍN OFICIAL DEL REGISTRO MERCANTIL(.*?)https://www.boe.es'
     start, end = match.span()
@@ -92,11 +90,7 @@ def map_constitucion(text):
         raise Exception('Word Constitución not found in text')
 
     constituciones_keywords = ['Comienzo de operaciones', 'Objeto social', 'Domicilio', 'Capital', 'Nombramientos', 'Datos registrales']
-    data = dict()
-    data = {
-        'Negocio': take_bussiness_name(text),
-        'Submission date': take_submission_date(text),
-    }
+    data = take_metadata(text)
     text = text.replace('\n', ' ')
     for index in range(len(constituciones_keywords) - 1):
         keyword = constituciones_keywords[index]
@@ -106,6 +100,24 @@ def map_constitucion(text):
         if match:
             data[keyword] = map_inner_word(text, keyword, next_keyword, match)
     return data
+
+def take_metadata(text):
+    metadatada = dict()
+    metadatada['Negocio'] = take_bussiness_name(text)
+    metadatada['Fecha envio'] = take_submission_date(text)
+    return metadatada
+
+def map_change_of_registered_office(text):
+    if not 'Cambio de domicilio social' in text:
+        raise Exception('Word Constitución not found in text')
+    
+    start = 'Cambio de domicilio social'
+    end = 'Datos registrales'
+    data = take_metadata(text)
+    match = re.search(r'{}(.*?){}'.format(start, end), text, re.DOTALL)
+    if match:
+        data['Domicilio'] = map_inner_word(text, start, end, match)
+    return dict() if data is None else data
 
 def take_bussiness(text):
     bussinesses_information = list(re.finditer(pattern, text, re.DOTALL))
@@ -120,6 +132,19 @@ def take_bussiness(text):
     bussinesses.append(text[last_start:])
     return bussinesses
 
+def map_labeled_bussinesses(labeled_tuple):
+    label, bussinesses_text = labeled_tuple
+    for text in bussinesses_text:
+        match label:
+            case 'Constitución':
+                # print(map_constitucion(text))
+                pass
+            case 'Cambio de domicilio social':
+                print(map_change_of_registered_office(text))
+            case 'Constitución':
+                pass
+
+
 if __name__ == '__main__':
     reader = PdfReader('BORME-A-2022-121-28.pdf')
     number_of_pages = len(reader.pages)
@@ -130,14 +155,9 @@ if __name__ == '__main__':
         
     bussinesses = take_bussiness(pdf_text)
     labeled_matches = list(map(lambda x: labeled_text(x, keywords), bussinesses))
-    group_by_labeled_matches = dict()
-    group_by_labeled_matches = reduce(convert, labeled_matches, group_by_labeled_matches)
+    paragraphs_bussines_labeled = dict()
+    paragraphs_bussines_labeled = reduce(convert, labeled_matches, paragraphs_bussines_labeled)
 
-    for label, bussinesses in group_by_labeled_matches.items():
-        match label:
-            case 'Constitución':
-                for bussiness in bussinesses:
-                    print(map_constitucion(bussiness))
-                    time.sleep(1)
-    
+    for label, bussinesses in paragraphs_bussines_labeled.items():
+        data = map_labeled_bussinesses((label, bussinesses))
     
