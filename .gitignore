@@ -3,4 +3,4 @@ __pycache__/
 export/
 *.zip
 .vscode/
-
+.json*

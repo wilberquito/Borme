@@ -1,9 +1,9 @@
 from ast import pattern
-from base64 import decode
 from PyPDF2 import PdfReader
 import re
 from functools import reduce
 import json
+import sys
 
 otros = 'Otros'
 keywords = ['Disolución', 'Cambio de domicilio social', 'Constitución']
@@ -187,7 +187,8 @@ def map_labeled_bussinesses(dic):
     return data
 
 if __name__ == '__main__':
-    reader = PdfReader('BORME-A-2022-121-28.pdf')
+    pdf_path = sys.argv[1]
+    reader = PdfReader(pdf_path)
     number_of_pages = len(reader.pages)
     pdf_text = ''
 
@@ -205,4 +206,4 @@ if __name__ == '__main__':
     
     with open('dump.json', 'w+', encoding='utf-8') as file:
         dump = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
-        file.write(dump.decode('utf-8'))
+        print(dump.decode('utf-8'))
