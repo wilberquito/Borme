@@ -7,12 +7,15 @@ others = 'Otros'
 keywords = ['Disolución', 'Cambio de domicilio social', 'Constitución']
 pattern = r'\d{6}\s*-'
 
+dissolution = 'disolution'
+registerd_office = 'registeredOffice'
+constitution = 'constitution'
+submission_date = 'submissionDate'
+bussines_name = 'bussinesName'
+
 def is_target(text, keywords):
     '''
-    text: string
-    keywords: list of strings
-    
-    search if any keyword is in the text
+    Search if any keyword is in the text
     '''
     for keyword in keywords:
         if keyword in text:
@@ -21,9 +24,6 @@ def is_target(text, keywords):
 
 def labeled_text(text, keywords):
     '''
-    text: string
-    keywords: list of strings
-    
     return a labeled tuple with the text and the keyword
     '''
     for keyword in keywords:
@@ -33,10 +33,8 @@ def labeled_text(text, keywords):
 
 def convert(accum, tup):
     '''
-    accum: dict
-    tup: tuple
-
-    search the first element of the tuple in the accumulator and add the second element to the list
+    Search the first element of the tuple in the accumulator 
+    and add the second element to the list
     '''
     try:
         a, b = tup
@@ -84,7 +82,7 @@ def map_inner_word(text, keyword, next_keyword, match):
 
 def map_constitucion(text):
     '''
-    text: string
+    Extracts the constitucion data from the text
     '''
     if not 'Constitución' in text:
         raise Exception('Word Constitución not found in text')
@@ -101,12 +99,6 @@ def map_constitucion(text):
             data[keyword] = map_inner_word(text, keyword, next_keyword, match)
     return data
 
-def take_metadata(text):
-    metadatada = dict()
-    metadatada['Negocio'] = take_bussiness_name(text)
-    metadatada['Fecha envio'] = take_submission_date(text)
-    return metadatada
-
 def map_change_of_registered_office(text):
     if not 'Cambio de domicilio social' in text:
         raise Exception('Word Constitución not found in text')
@@ -119,7 +111,31 @@ def map_change_of_registered_office(text):
         data['Domicilio'] = map_inner_word(text, start, end, match)
     return dict() if data is None else data
 
-def take_bussiness(text):
+def map_disolucion(text):
+    if not 'Disolución' in text:
+        raise Exception('Word Disolución not found in text')
+    
+    start = 'Disolución'
+    end = 'Datos registrales'
+    data = take_metadata(text)
+    match = re.search(r'{}(.*?){}'.format(start, end), text, re.DOTALL)
+    if match:
+        data[dissolution] = map_inner_word(text, start, end, match)
+    return dict() if data is None else data
+
+def take_metadata(text):
+    '''
+    Extracts 'negocio' and 'fecha de envio' from the text
+    '''
+    metadatada = dict()
+    metadatada[bussines_name] = take_bussiness_name(text)
+    metadatada[submission_date] = take_submission_date(text)
+    return metadatada
+
+def take_bussinesses(text):
+    '''
+    Returns a list of paragraphs, where each paragraph represents bussiness movement
+    '''
     bussinesses_information = list(re.finditer(pattern, text, re.DOTALL))
     last_start = 0
     bussinesses = list()
@@ -132,16 +148,18 @@ def take_bussiness(text):
     bussinesses.append(text[last_start:])
     return bussinesses
 
-def map_labeled_bussinesses(labeled_tuple):
-    label, bussinesses_text = labeled_tuple
-    for text in bussinesses_text:
+def map_labeled_bussinesses(dic):
+    label, paragraphs = dic
+    for paragraph in paragraphs:
         match label:
             case 'Constitución':
-                # print(map_constitucion(text))
+                # print(map_constitucion(paragraph))
                 pass
             case 'Cambio de domicilio social':
-                print(map_change_of_registered_office(text))
-            case 'Constitución':
+                # print(map_change_of_registered_office(paragraph))
+                pass
+            case 'Disolución':
+                print(map_disolucion(paragraph))
                 pass
 
 
@@ -153,11 +171,11 @@ if __name__ == '__main__':
     for (i, page) in enumerate(reader.pages):
         pdf_text += page.extract_text()
         
-    bussinesses = take_bussiness(pdf_text)
-    labeled_matches = list(map(lambda x: labeled_text(x, keywords), bussinesses))
-    paragraphs_bussines_labeled = dict()
-    paragraphs_bussines_labeled = reduce(convert, labeled_matches, paragraphs_bussines_labeled)
+    bussinesses = take_bussinesses(pdf_text)
+    labeled_paragraphs = list(map(lambda x: labeled_text(x, keywords), bussinesses))
+    dict_paragraphs = dict()
+    dict_paragraphs = reduce(convert, labeled_paragraphs, dict_paragraphs)
 
-    for label, bussinesses in paragraphs_bussines_labeled.items():
+    for label, bussinesses in dict_paragraphs.items():
         data = map_labeled_bussinesses((label, bussinesses))
     
