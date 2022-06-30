@@ -1,17 +1,41 @@
 from ast import pattern
+from base64 import decode
 from PyPDF2 import PdfReader
 import re
 from functools import reduce
+import json
 
-others = 'Otros'
+otros = 'Otros'
 keywords = ['Disolución', 'Cambio de domicilio social', 'Constitución']
 pattern = r'\d{6}\s*-'
 
 dissolution = 'disolution'
 registerd_office = 'registeredOffice'
 constitution = 'constitution'
+others = 'others'
 submission_date = 'submissionDate'
 bussines_name = 'bussinesName'
+cause = 'cause'
+address = 'address'
+operations_start = 'operationsStart'
+social_object = 'socialObject'
+domicile = 'domicile'
+capital = 'capital'
+appointments = 'appointments'
+registry_data = 'registryData'
+
+mapping_keywords = {
+    'Disolución': dissolution,
+    'Cambio de domicilio social': registerd_office,
+    'Constitución': constitution,
+    'Comienzo de operaciones': operations_start,
+    'Objeto social': social_object,
+    'Domicilio': domicile,
+    'Capital': capital,
+    'Nombramientos': appointments,
+    'Datos registrales': registry_data,
+    'Otros': others
+}
 
 def is_target(text, keywords):
     '''
@@ -29,7 +53,7 @@ def labeled_text(text, keywords):
     for keyword in keywords:
         if keyword in text:
             return (keyword, text)
-    return (others, text)
+    return (otros, text)
 
 def convert(accum, tup):
     '''
@@ -96,7 +120,7 @@ def map_constitucion(text):
         regex = r'{}(.*?){}'.format(keyword, next_keyword)
         match = re.search(regex, text, re.DOTALL)
         if match:
-            data[keyword] = map_inner_word(text, keyword, next_keyword, match)
+            data[mapping_keywords[keyword]] = map_inner_word(text, keyword, next_keyword, match)
     return data
 
 def map_change_of_registered_office(text):
@@ -108,7 +132,7 @@ def map_change_of_registered_office(text):
     data = take_metadata(text)
     match = re.search(r'{}(.*?){}'.format(start, end), text, re.DOTALL)
     if match:
-        data['Domicilio'] = map_inner_word(text, start, end, match)
+        data[address] = map_inner_word(text, start, end, match)
     return dict() if data is None else data
 
 def map_disolucion(text):
@@ -120,7 +144,7 @@ def map_disolucion(text):
     data = take_metadata(text)
     match = re.search(r'{}(.*?){}'.format(start, end), text, re.DOTALL)
     if match:
-        data[dissolution] = map_inner_word(text, start, end, match)
+        data[cause] = map_inner_word(text, start, end, match)
     return dict() if data is None else data
 
 def take_metadata(text):
@@ -150,18 +174,17 @@ def take_bussinesses(text):
 
 def map_labeled_bussinesses(dic):
     label, paragraphs = dic
+    bussiness_label = mapping_keywords[label]
+    data = dict()
     for paragraph in paragraphs:
         match label:
             case 'Constitución':
-                # print(map_constitucion(paragraph))
-                pass
+                data.setdefault(bussiness_label, []).append(map_constitucion(paragraph))
             case 'Cambio de domicilio social':
-                # print(map_change_of_registered_office(paragraph))
-                pass
+                data.setdefault(bussiness_label, []).append(map_change_of_registered_office(paragraph))
             case 'Disolución':
-                print(map_disolucion(paragraph))
-                pass
-
+                data.setdefault(bussiness_label, []).append(map_disolucion(paragraph))
+    return data
 
 if __name__ == '__main__':
     reader = PdfReader('BORME-A-2022-121-28.pdf')
@@ -176,6 +199,10 @@ if __name__ == '__main__':
     dict_paragraphs = dict()
     dict_paragraphs = reduce(convert, labeled_paragraphs, dict_paragraphs)
 
+    data = dict()
     for label, bussinesses in dict_paragraphs.items():
-        data = map_labeled_bussinesses((label, bussinesses))
+        data.update(map_labeled_bussinesses((label, bussinesses)))
     
+    with open('dump.json', 'w+', encoding='utf-8') as file:
+        dump = json.dumps(data, ensure_ascii=False, indent=4).encode('utf-8')
+        file.write(dump.decode('utf-8'))
